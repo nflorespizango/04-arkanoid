@@ -2,7 +2,8 @@
 
 const CANVAS_W = 640, CANVAS_H = 600;
 const HUD_H = 60;
-const BLOCK_W = 64, BLOCK_H = 32;
+const BLOCKS_MARGIN_X = 40;
+const BLOCK_W = (CANVAS_W - 2 * BLOCKS_MARGIN_X) / 10, BLOCK_H = 32;
 const BLOCK_COLS = 10;
 const BLOCKS_TOP = 80;
 const ROW_COLORS = ['red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green'];
@@ -27,51 +28,7 @@ const PARTICLE_DURATION = 400;
 const PARTICLE_SPEED_MIN = 80;
 const PARTICLE_SPEED_MAX = 220;
 const PARTICLE_GRAVITY = 600;
-const LEVEL_COUNT = 5;
 const LEVEL_SPEED_STEP = 0.08;
-const LEVEL_COLORS = { r: 'red', y: 'yellow', c: 'cyan', m: 'magenta', h: 'hotpink', g: 'green' };
-const LEVELS = [
-  [
-    'rrrrrrrrrr',
-    'yyyyyyyyyy',
-    'cccccccccc',
-    'mmmmmmmmmm',
-    'hhhhhhhhhh',
-    'gggggggggg',
-  ],
-  [
-    '....rr....',
-    '...yyyy...',
-    '..cccccc..',
-    '.mmmmmmmm.',
-    'hhhhhhhhhh',
-    'gggggggggg',
-  ],
-  [
-    'r.r.r.r.r.',
-    '.y.y.y.y.y',
-    'c.c.c.c.c.',
-    '.m.m.m.m.m',
-    'h.h.h.h.h.',
-    '.g.g.g.g.g',
-  ],
-  [
-    'r.y.cc.y.r',
-    'r.y.cc.y.r',
-    'r.y.cc.y.r',
-    'r.y.cc.y.r',
-    'r.y.cc.y.r',
-    'r.y.cc.y.r',
-  ],
-  [
-    'rrrrrrrrrr',
-    'r...yy...r',
-    'r..cccc..r',
-    'r.mmmmmm.r',
-    'r..hhhh..r',
-    'rrrrrrrrrr',
-  ],
-];
 const PARTICLE_COLORS = {
   red: '#c02a3e',
   yellow: '#d9bd4c',
@@ -130,7 +87,7 @@ function createBlocks(level) {
       const color = LEVEL_COLORS[line[col]];
       if (!color) continue;
       blocks.push({
-        x: col * BLOCK_W,
+        x: BLOCKS_MARGIN_X + col * BLOCK_W,
         y: BLOCKS_TOP + row * BLOCK_H,
         w: BLOCK_W,
         h: BLOCK_H,
