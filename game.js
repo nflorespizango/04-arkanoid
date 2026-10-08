@@ -17,6 +17,10 @@ const MAX_BOUNCE_ANGLE = 60;
 const INITIAL_LIVES = 3;
 const MAX_DT = 1 / 30;
 const END_INPUT_LOCK = 500;
+const SOUND_BOUNCE_SRC = 'assets/sounds/ball-bounce.mp3';
+const SOUND_BREAK_SRC = 'assets/sounds/break-sound.mp3';
+const SOUND_VOLUME = 0.5;
+const EXPLOSION_FRAME_COUNT = 4;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -29,12 +33,27 @@ const game = {
   paddle: { x: (CANVAS_W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H },
   ball: { x: 0, y: 0, vx: 0, vy: 0 },
   blocks: [],
+  explosions: [],
 };
 
 const keys = {};
 
+const sounds = {
+  bounce: new Audio(SOUND_BOUNCE_SRC),
+  break: new Audio(SOUND_BREAK_SRC),
+};
+for (const s of Object.values(sounds)) s.preload = 'auto';
+let muted = false;
+
 const toRad = deg => deg * Math.PI / 180;
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+function playSound(base) {
+  if (muted) return;
+  const a = base.cloneNode();
+  a.volume = SOUND_VOLUME;
+  a.play().catch(() => {});
+}
 
 // --- Estado ---
 
@@ -70,6 +89,7 @@ function resetGame() {
   game.endedAt = 0;
   game.paddle.x = (CANVAS_W - PADDLE_W) / 2;
   game.blocks = createBlocks();
+  game.explosions = [];
   attachBall();
 }
 
@@ -98,6 +118,7 @@ window.addEventListener('keydown', e => {
   if (PREVENT_KEYS.includes(e.code)) e.preventDefault();
   keys[e.code] = true;
   if (e.repeat) return;
+  if (e.code === 'KeyM') muted = !muted;
   if (e.code === 'Space' && game.status === 'ready') launchBall();
   if (e.code === 'Enter' && (game.status === 'won' || game.status === 'lost') && restartAllowed()) resetGame();
 });
@@ -136,13 +157,16 @@ function bounceWalls(ball) {
   if (ball.x - BALL_R < 0) {
     ball.x = BALL_R;
     ball.vx = Math.abs(ball.vx);
+    playSound(sounds.bounce);
   } else if (ball.x + BALL_R > CANVAS_W) {
     ball.x = CANVAS_W - BALL_R;
     ball.vx = -Math.abs(ball.vx);
+    playSound(sounds.bounce);
   }
   if (ball.y - BALL_R < HUD_H) {
     ball.y = HUD_H + BALL_R;
     ball.vy = Math.abs(ball.vy);
+    playSound(sounds.bounce);
   }
 }
 
@@ -156,6 +180,7 @@ function bouncePaddle(ball, paddle) {
   const angle = toRad(offset * MAX_BOUNCE_ANGLE);
   ball.vx = BALL_SPEED * Math.sin(angle);
   ball.vy = -BALL_SPEED * Math.cos(angle);
+  playSound(sounds.bounce);
 }
 
 function bounceBlock(ball) {
@@ -182,6 +207,8 @@ function bounceBlock(ball) {
   }
 
   best.alive = false;
+  playSound(sounds.break);
+  game.explosions.push({ x: best.x, y: best.y, w: best.w, h: best.h, color: best.color, elapsed: 0 });
   game.score += best.points;
   if (!game.blocks.some(b => b.alive)) endGame('won');
 }
@@ -196,7 +223,13 @@ function loseLife() {
   }
 }
 
+function updateExplosions(dt) {
+  for (const ex of game.explosions) ex.elapsed += dt * 1000;
+  game.explosions = game.explosions.filter(ex => ex.elapsed < EXPLOSION_DURATION);
+}
+
 function update(dt) {
+  updateExplosions(dt);
   if (game.status === 'won' || game.status === 'lost') return;
 
   movePaddleByKeys(dt);
@@ -235,9 +268,18 @@ function render() {
   ctx.fillText(`Puntos: ${game.score}`, 16, HUD_H / 2);
   ctx.textAlign = 'right';
   ctx.fillText(`Vidas: ${game.lives}`, CANVAS_W - 16, HUD_H / 2);
+  if (muted) {
+    ctx.textAlign = 'center';
+    ctx.fillText('Silencio (M)', CANVAS_W / 2, HUD_H / 2);
+  }
 
   for (const b of game.blocks) {
     if (b.alive) drawSprite(ctx, `block_${b.color}`, b.x, b.y, b.w, b.h);
+  }
+  const frameMs = EXPLOSION_DURATION / EXPLOSION_FRAME_COUNT;
+  for (const ex of game.explosions) {
+    const i = Math.min(EXPLOSION_FRAME_COUNT - 1, Math.floor(ex.elapsed / frameMs));
+    drawFrame(ctx, EXPLOSION_FRAMES[ex.color][i], ex.x, ex.y, ex.w, ex.h);
   }
   const p = game.paddle;
   drawSprite(ctx, 'paddle', p.x, p.y, p.w, p.h);
