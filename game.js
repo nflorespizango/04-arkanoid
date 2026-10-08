@@ -1,15 +1,16 @@
 // Arkanoid MVP — ver specs/01-mvp-jugable.md
 
-const CANVAS_W = 640, CANVAS_H = 600;
-const HUD_H = 60;
-const BLOCKS_MARGIN_X = 40;
-const BLOCK_W = (CANVAS_W - 2 * BLOCKS_MARGIN_X) / 10, BLOCK_H = 32;
+const CANVAS_W = 800, CANVAS_H = 600;
+const HUD_H = 50;
 const BLOCK_COLS = 10;
-const BLOCKS_TOP = 80;
+const BLOCK_W = 65, BLOCK_H = 22;
+const BLOCK_GAP_X = 4, BLOCK_GAP_Y = 3;
+const BLOCKS_MARGIN_X = (CANVAS_W - (BLOCK_COLS * BLOCK_W + (BLOCK_COLS - 1) * BLOCK_GAP_X)) / 2;
+const BLOCKS_TOP = 90;
 const ROW_COLORS = ['red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green'];
 const ROW_POINTS = [60, 50, 40, 30, 20, 10];
 const PADDLE_W = 120, PADDLE_H = 14;
-const PADDLE_Y = 560;
+const PADDLE_Y = 570;
 const PADDLE_SPEED = 480;
 const BALL_R = 8;
 const BALL_SPEED = 360;
@@ -29,6 +30,7 @@ const PARTICLE_SPEED_MIN = 80;
 const PARTICLE_SPEED_MAX = 220;
 const PARTICLE_GRAVITY = 600;
 const LEVEL_SPEED_STEP = 0.08;
+const PAUSE_BTN_W = 64, PAUSE_BTN_H = 40, PAUSE_BTN_GAP = 11, PAUSE_BTN_Y = 355;
 const PARTICLE_COLORS = {
   red: '#c02a3e',
   yellow: '#d9bd4c',
@@ -67,6 +69,11 @@ let muted = false;
 const toRad = deg => deg * Math.PI / 180;
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+function pauseButtonX(i) {
+  const total = LEVEL_COUNT * PAUSE_BTN_W + (LEVEL_COUNT - 1) * PAUSE_BTN_GAP;
+  return (CANVAS_W - total) / 2 + i * (PAUSE_BTN_W + PAUSE_BTN_GAP);
+}
+
 function playSound(base) {
   if (muted) return;
   const a = base.cloneNode();
@@ -87,8 +94,8 @@ function createBlocks(level) {
       const color = LEVEL_COLORS[line[col]];
       if (!color) continue;
       blocks.push({
-        x: BLOCKS_MARGIN_X + col * BLOCK_W,
-        y: BLOCKS_TOP + row * BLOCK_H,
+        x: BLOCKS_MARGIN_X + col * (BLOCK_W + BLOCK_GAP_X),
+        y: BLOCKS_TOP + row * (BLOCK_H + BLOCK_GAP_Y),
         w: BLOCK_W,
         h: BLOCK_H,
         color,
@@ -184,7 +191,21 @@ canvas.addEventListener('mousemove', e => {
 });
 
 canvas.addEventListener('mousedown', e => {
-  if (e.button !== 0 || game.paused) return;
+  if (e.button !== 0) return;
+  if (game.paused) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - canvas.clientLeft) * (CANVAS_W / canvas.clientWidth);
+    const my = (e.clientY - rect.top - canvas.clientTop) * (CANVAS_H / canvas.clientHeight);
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      const bx = pauseButtonX(i);
+      if (mx >= bx && mx <= bx + PAUSE_BTN_W && my >= PAUSE_BTN_Y && my <= PAUSE_BTN_Y + PAUSE_BTN_H) {
+        startLevel(i + 1);
+        game.paused = false;
+        return;
+      }
+    }
+    return;
+  }
   if (game.status === 'ready') launchBall();
   else if ((game.status === 'won' || game.status === 'lost') && restartAllowed()) resetGame();
 });
@@ -335,18 +356,28 @@ function drawCenteredText(text, y, size) {
   ctx.fillText(text, CANVAS_W / 2, y);
 }
 
+function drawCenteredAt(text, x, y, size) {
+  ctx.font = `bold ${size}px monospace`;
+  ctx.fillText(text, x, y);
+}
+
 function render() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   ctx.fillStyle = '#fff';
   ctx.textBaseline = 'middle';
 
-  ctx.font = '20px monospace';
+  ctx.font = '18px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(`Puntos: ${game.score}`, 16, HUD_H / 2);
-  ctx.textAlign = 'right';
-  ctx.fillText(`Vidas: ${game.lives}`, CANVAS_W - 16, HUD_H / 2);
+  ctx.fillText(`Score: ${game.score}`, 16, HUD_H / 2);
   ctx.textAlign = 'center';
-  ctx.fillText(muted ? `Nivel ${game.level} - Silencio (M)` : `Nivel ${game.level}`, CANVAS_W / 2, HUD_H / 2);
+  ctx.fillText(muted ? `Nivel: ${game.level} - Silencio (M)` : `Nivel: ${game.level}`, CANVAS_W / 2, HUD_H / 2);
+  for (let i = 0; i < INITIAL_LIVES; i++) {
+    ctx.beginPath();
+    ctx.arc(CANVAS_W - 24 - i * 22, HUD_H / 2, 7, 0, Math.PI * 2);
+    ctx.fillStyle = i < game.lives ? '#ccc' : '#444';
+    ctx.fill();
+  }
+  ctx.fillStyle = '#fff';
 
   for (const b of game.blocks) {
     if (b.alive) drawSprite(ctx, `block_${b.color}`, b.x, b.y, b.w, b.h);
@@ -374,7 +405,7 @@ function render() {
 
   ctx.textAlign = 'center';
   if (game.status === 'ready') {
-    drawCenteredText('Espacio o clic para lanzar', 400, 20);
+    drawCenteredText('Espacio o clic para lanzar', 420, 20);
   } else if (game.status === 'won' || game.status === 'lost') {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
@@ -387,10 +418,26 @@ function render() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     ctx.fillStyle = '#fff';
-    drawCenteredText('Pausa', 230, 48);
-    drawCenteredText(`Nivel actual: ${game.level}`, 290, 24);
-    drawCenteredText(`Pulsa 1-${LEVEL_COUNT} para ir a un nivel`, 340, 20);
-    drawCenteredText('P o Esc para continuar', 380, 18);
+    ctx.shadowColor = '#8cf';
+    ctx.shadowBlur = 20;
+    drawCenteredText('PAUSA', 270, 56);
+    ctx.shadowBlur = 0;
+    drawCenteredText('Saltar al nivel:', 325, 16);
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      const bx = pauseButtonX(i);
+      const current = i + 1 === game.level;
+      ctx.fillStyle = current ? '#f5e27a' : 'rgba(0, 0, 0, 0.4)';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(bx, PAUSE_BTN_Y, PAUSE_BTN_W, PAUSE_BTN_H, 6);
+      ctx.fill();
+      if (!current) ctx.stroke();
+      ctx.fillStyle = current ? '#000' : '#fff';
+      drawCenteredAt(String(i + 1), bx + PAUSE_BTN_W / 2, PAUSE_BTN_Y + PAUSE_BTN_H / 2, 22);
+    }
+    ctx.fillStyle = '#fff';
+    drawCenteredText('P o Esc para continuar', 430, 16);
   }
 }
 
