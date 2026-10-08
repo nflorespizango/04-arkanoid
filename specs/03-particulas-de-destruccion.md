@@ -1,6 +1,6 @@
 # SPEC 03 — Partículas de destrucción de bloques
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-10-08
 > **Objective:** Al romper un bloque, lanzar 8 partículas del color del bloque que salen despedidas, caen y se desvanecen en 400 ms, en paralelo a la explosión de 4 frames existente y sin tocar las reglas de juego ni el audio.
@@ -82,26 +82,26 @@ Convenciones:
 
 **Efecto**
 
-- [ ] Al romper un bloque aparecen exactamente 8 partículas de 4x4 px en el centro del bloque.
-- [ ] Las partículas tienen el color del bloque roto en las 6 filas.
-- [ ] Las partículas salen en direcciones distintas, caen y se desvanecen hasta ser invisibles.
-- [ ] Cada partícula desaparece de `game.particles` a los 400 ms (±1 frame) de haber sido creada.
-- [ ] La explosión de 4 frames sigue dibujándose y dura 150 ms, a la vez que las partículas.
-- [ ] Dos bloques rotos en frames seguidos tienen sus partículas animándose en paralelo, cada una con su propio `elapsed`.
+- [x] Al romper un bloque aparecen exactamente 8 partículas de 4x4 px en el centro del bloque.
+- [x] Las partículas tienen el color del bloque roto en las 6 filas.
+- [x] Las partículas salen en direcciones distintas, caen y se desvanecen hasta ser invisibles.
+- [x] Cada partícula desaparece de `game.particles` a los 400 ms (±1 frame) de haber sido creada.
+- [x] La explosión de 4 frames sigue dibujándose y dura 150 ms, a la vez que las partículas.
+- [x] Dos bloques rotos en frames seguidos tienen sus partículas animándose en paralelo, cada una con su propio `elapsed`.
 
 **Integración**
 
-- [ ] Las partículas no afectan a la pelota, a los bloques ni a la puntuación (no colisionan).
-- [ ] Las partículas no tapan la pelota, la paleta ni el velo de `won`/`lost`.
-- [ ] Al romper el último bloque, las partículas terminan de animarse antes de que desaparezcan, con `¡Ganaste!` ya visible.
-- [ ] Tras reiniciar con `Enter` o clic, `game.particles.length === 0`.
-- [ ] Con la pestaña oculta varios segundos, las partículas no saltan ni se acumulan al volver.
-- [ ] No cambia ningún comportamiento de audio (sonidos y tecla `M` iguales que en la spec 02).
-- [ ] No aparece ningún error en la consola, tampoco con `file://`.
+- [x] Las partículas no afectan a la pelota, a los bloques ni a la puntuación (no colisionan).
+- [x] Las partículas no tapan la pelota, la paleta ni el velo de `won`/`lost`.
+- [x] Al romper el último bloque, las partículas terminan de animarse antes de que desaparezcan, con `¡Ganaste!` ya visible.
+- [x] Tras reiniciar con `Enter` o clic, `game.particles.length === 0`.
+- [x] Con la pestaña oculta varios segundos, las partículas no saltan ni se acumulan al volver.
+- [x] No cambia ningún comportamiento de audio (sonidos y tecla `M` iguales que en la spec 02).
+- [x] No aparece ningún error en la consola, tampoco con `file://`.
 
 **Regresión**
 
-- [ ] Los criterios de aceptación de las specs 01 y 02 siguen cumpliéndose.
+- [x] Los criterios de aceptación de las specs 01 y 02 siguen cumpliéndose.
 
 ## Pruebas manuales
 

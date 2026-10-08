@@ -21,6 +21,20 @@ const SOUND_BOUNCE_SRC = 'assets/sounds/ball-bounce.mp3';
 const SOUND_BREAK_SRC = 'assets/sounds/break-sound.mp3';
 const SOUND_VOLUME = 0.5;
 const EXPLOSION_FRAME_COUNT = 4;
+const PARTICLES_PER_BLOCK = 8;
+const PARTICLE_SIZE = 4;
+const PARTICLE_DURATION = 400;
+const PARTICLE_SPEED_MIN = 80;
+const PARTICLE_SPEED_MAX = 220;
+const PARTICLE_GRAVITY = 600;
+const PARTICLE_COLORS = {
+  red: '#c02a3e',
+  yellow: '#d9bd4c',
+  cyan: '#4fc99c',
+  magenta: '#632ff4',
+  hotpink: '#fc7d1c',
+  green: '#44aaf3',
+};
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -34,6 +48,7 @@ const game = {
   ball: { x: 0, y: 0, vx: 0, vy: 0 },
   blocks: [],
   explosions: [],
+  particles: [],
 };
 
 const keys = {};
@@ -90,6 +105,7 @@ function resetGame() {
   game.paddle.x = (CANVAS_W - PADDLE_W) / 2;
   game.blocks = createBlocks();
   game.explosions = [];
+  game.particles = [];
   attachBall();
 }
 
@@ -183,6 +199,22 @@ function bouncePaddle(ball, paddle) {
   playSound(sounds.bounce);
 }
 
+function spawnParticles(block) {
+  const x = block.x + block.w / 2;
+  const y = block.y + block.h / 2;
+  for (let i = 0; i < PARTICLES_PER_BLOCK; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = PARTICLE_SPEED_MIN + Math.random() * (PARTICLE_SPEED_MAX - PARTICLE_SPEED_MIN);
+    game.particles.push({
+      x, y,
+      vx: speed * Math.cos(angle),
+      vy: speed * Math.sin(angle),
+      color: block.color,
+      elapsed: 0,
+    });
+  }
+}
+
 function bounceBlock(ball) {
   let best = null, bestArea = 0, bestOx = 0, bestOy = 0;
   for (const b of game.blocks) {
@@ -209,6 +241,7 @@ function bounceBlock(ball) {
   best.alive = false;
   playSound(sounds.break);
   game.explosions.push({ x: best.x, y: best.y, w: best.w, h: best.h, color: best.color, elapsed: 0 });
+  spawnParticles(best);
   game.score += best.points;
   if (!game.blocks.some(b => b.alive)) endGame('won');
 }
@@ -228,8 +261,19 @@ function updateExplosions(dt) {
   game.explosions = game.explosions.filter(ex => ex.elapsed < EXPLOSION_DURATION);
 }
 
+function updateParticles(dt) {
+  for (const p of game.particles) {
+    p.elapsed += dt * 1000;
+    p.vy += PARTICLE_GRAVITY * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+  game.particles = game.particles.filter(p => p.elapsed < PARTICLE_DURATION);
+}
+
 function update(dt) {
   updateExplosions(dt);
+  updateParticles(dt);
   if (game.status === 'won' || game.status === 'lost') return;
 
   movePaddleByKeys(dt);
@@ -281,6 +325,18 @@ function render() {
     const i = Math.min(EXPLOSION_FRAME_COUNT - 1, Math.floor(ex.elapsed / frameMs));
     drawFrame(ctx, EXPLOSION_FRAMES[ex.color][i], ex.x, ex.y, ex.w, ex.h);
   }
+  for (const pt of game.particles) {
+    ctx.globalAlpha = 1 - pt.elapsed / PARTICLE_DURATION;
+    ctx.fillStyle = PARTICLE_COLORS[pt.color];
+    ctx.fillRect(
+      Math.round(pt.x - PARTICLE_SIZE / 2),
+      Math.round(pt.y - PARTICLE_SIZE / 2),
+      PARTICLE_SIZE,
+      PARTICLE_SIZE
+    );
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#fff';
   const p = game.paddle;
   drawSprite(ctx, 'paddle', p.x, p.y, p.w, p.h);
   drawSprite(ctx, 'ball', game.ball.x - BALL_R, game.ball.y - BALL_R, BALL_R * 2, BALL_R * 2);
