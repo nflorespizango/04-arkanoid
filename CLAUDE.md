@@ -8,9 +8,13 @@ Siempre responder en español en este proyecto.
 
 ## Estado del proyecto
 
-Juego de Arkanoid en HTML, CSS y JavaScript puro, **sin dependencias** (ver `README.md`). El juego **todavía no está implementado**: no hay `index.html`, ni sistema de build, ni gestor de paquetes, ni tests, ni configuración de lint. Solo existen los assets. Todavía no es un repositorio git.
+Juego de Arkanoid en HTML, CSS y JavaScript puro, **sin dependencias** (ver `README.md`, que aún dice que no está implementado y está desactualizado). Es un repositorio git (rama `main`). El MVP de la spec 01 (`specs/01-mvp-jugable.md`) **ya está implementado** en `index.html`, `style.css` y `game.js` (un único script clásico, sin módulos), y se verificó su lógica y su renderizado. No hay sistema de build, gestor de paquetes, tests automatizados ni configuración de lint.
 
-Como no hay paso de build, se espera que el juego se ejecute abriendo `index.html` en un navegador (o con cualquier servidor de archivos estáticos). Ojo: `assets/spritesheet.js` carga el PNG con una ruta relativa (`assets/spritesheet-breakout.png`) y lo copia a un canvas fuera de pantalla, por lo que `index.html` debe estar en la raíz del repositorio, y si se usara `getImageData` habría que servir los archivos por HTTP en vez de `file://`.
+Estructura: `index.html` (canvas `#canvas` de 640x600, carga `assets/spritesheet.js` y luego `game.js`), `style.css`, `game.js` (constantes, objeto global `game`, entrada, colisiones, bucle y dibujo) y `assets/`. Las specs de `specs/` van por delante del código: la spec 02 (`specs/02-sonido-y-explosiones.md`, sonido, explosiones y tecla `M`) está aprobada pero **todavía no se ha implementado**.
+
+Como no hay paso de build, el juego se ejecuta abriendo `index.html` en un navegador (o con cualquier servidor de archivos estáticos). Ojo: `assets/spritesheet.js` carga el PNG con una ruta relativa (`assets/spritesheet-breakout.png`) y lo copia a un canvas fuera de pantalla, por lo que `index.html` debe estar en la raíz del repositorio, y si se usara `getImageData` habría que servir los archivos por HTTP en vez de `file://`.
+
+Antes de crear o sobrescribir archivos hay que comprobar si ya existen (`git status`, `git ls-files`): este documento llegó a decir que no existía nada y era falso.
 
 ## Assets
 
