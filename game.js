@@ -1,0 +1,278 @@
+// Arkanoid MVP — ver specs/01-mvp-jugable.md
+
+const CANVAS_W = 640, CANVAS_H = 600;
+const HUD_H = 60;
+const BLOCK_W = 64, BLOCK_H = 32;
+const BLOCK_COLS = 10;
+const BLOCKS_TOP = 80;
+const ROW_COLORS = ['red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green'];
+const ROW_POINTS = [60, 50, 40, 30, 20, 10];
+const PADDLE_W = 120, PADDLE_H = 14;
+const PADDLE_Y = 560;
+const PADDLE_SPEED = 480;
+const BALL_R = 8;
+const BALL_SPEED = 360;
+const LAUNCH_ANGLE = 15;
+const MAX_BOUNCE_ANGLE = 60;
+const INITIAL_LIVES = 3;
+const MAX_DT = 1 / 30;
+const END_INPUT_LOCK = 500;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const game = {
+  status: 'ready',
+  score: 0,
+  lives: INITIAL_LIVES,
+  endedAt: 0,
+  paddle: { x: (CANVAS_W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H },
+  ball: { x: 0, y: 0, vx: 0, vy: 0 },
+  blocks: [],
+};
+
+const keys = {};
+
+const toRad = deg => deg * Math.PI / 180;
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+// --- Estado ---
+
+function createBlocks() {
+  const blocks = [];
+  ROW_COLORS.forEach((color, row) => {
+    for (let col = 0; col < BLOCK_COLS; col++) {
+      blocks.push({
+        x: col * BLOCK_W,
+        y: BLOCKS_TOP + row * BLOCK_H,
+        w: BLOCK_W,
+        h: BLOCK_H,
+        color,
+        points: ROW_POINTS[row],
+        alive: true,
+      });
+    }
+  });
+  return blocks;
+}
+
+function attachBall() {
+  game.ball.x = game.paddle.x + PADDLE_W / 2;
+  game.ball.y = game.paddle.y - BALL_R;
+  game.ball.vx = 0;
+  game.ball.vy = 0;
+}
+
+function resetGame() {
+  game.status = 'ready';
+  game.score = 0;
+  game.lives = INITIAL_LIVES;
+  game.endedAt = 0;
+  game.paddle.x = (CANVAS_W - PADDLE_W) / 2;
+  game.blocks = createBlocks();
+  attachBall();
+}
+
+function endGame(status) {
+  game.status = status;
+  game.endedAt = performance.now();
+  game.ball.vx = 0;
+  game.ball.vy = 0;
+}
+
+function launchBall() {
+  game.ball.vx = BALL_SPEED * Math.sin(toRad(LAUNCH_ANGLE));
+  game.ball.vy = -BALL_SPEED * Math.cos(toRad(LAUNCH_ANGLE));
+  game.status = 'playing';
+}
+
+function restartAllowed() {
+  return performance.now() - game.endedAt >= END_INPUT_LOCK;
+}
+
+// --- Entrada ---
+
+const PREVENT_KEYS = ['ArrowLeft', 'ArrowRight', 'Space'];
+
+window.addEventListener('keydown', e => {
+  if (PREVENT_KEYS.includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if (e.repeat) return;
+  if (e.code === 'Space' && game.status === 'ready') launchBall();
+  if (e.code === 'Enter' && (game.status === 'won' || game.status === 'lost') && restartAllowed()) resetGame();
+});
+
+window.addEventListener('keyup', e => {
+  keys[e.code] = false;
+});
+
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (game.status !== 'ready' && game.status !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = (e.clientX - rect.left - canvas.clientLeft) * (CANVAS_W / canvas.clientWidth);
+  game.paddle.x = clamp(mouseX - PADDLE_W / 2, 0, CANVAS_W - PADDLE_W);
+});
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  if (game.status === 'ready') launchBall();
+  else if ((game.status === 'won' || game.status === 'lost') && restartAllowed()) resetGame();
+});
+
+// --- Actualización ---
+
+function movePaddleByKeys(dt) {
+  const left = keys.ArrowLeft || keys.KeyA;
+  const right = keys.ArrowRight || keys.KeyD;
+  const dir = (right ? 1 : 0) - (left ? 1 : 0);
+  if (dir) game.paddle.x = clamp(game.paddle.x + dir * PADDLE_SPEED * dt, 0, CANVAS_W - PADDLE_W);
+}
+
+function bounceWalls(ball) {
+  if (ball.x - BALL_R < 0) {
+    ball.x = BALL_R;
+    ball.vx = Math.abs(ball.vx);
+  } else if (ball.x + BALL_R > CANVAS_W) {
+    ball.x = CANVAS_W - BALL_R;
+    ball.vx = -Math.abs(ball.vx);
+  }
+  if (ball.y - BALL_R < HUD_H) {
+    ball.y = HUD_H + BALL_R;
+    ball.vy = Math.abs(ball.vy);
+  }
+}
+
+function bouncePaddle(ball, paddle) {
+  if (ball.vy <= 0 || ball.y > paddle.y) return;
+  const overlapsX = ball.x + BALL_R > paddle.x && ball.x - BALL_R < paddle.x + paddle.w;
+  const overlapsY = ball.y + BALL_R >= paddle.y && ball.y - BALL_R <= paddle.y + paddle.h;
+  if (!overlapsX || !overlapsY) return;
+  ball.y = paddle.y - BALL_R;
+  const offset = clamp((ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2), -1, 1);
+  const angle = toRad(offset * MAX_BOUNCE_ANGLE);
+  ball.vx = BALL_SPEED * Math.sin(angle);
+  ball.vy = -BALL_SPEED * Math.cos(angle);
+}
+
+function bounceBlock(ball) {
+  let best = null, bestArea = 0, bestOx = 0, bestOy = 0;
+  for (const b of game.blocks) {
+    if (!b.alive) continue;
+    const ox = Math.min(ball.x + BALL_R, b.x + b.w) - Math.max(ball.x - BALL_R, b.x);
+    const oy = Math.min(ball.y + BALL_R, b.y + b.h) - Math.max(ball.y - BALL_R, b.y);
+    if (ox <= 0 || oy <= 0) continue;
+    if (ox * oy > bestArea) {
+      best = b; bestArea = ox * oy; bestOx = ox; bestOy = oy;
+    }
+  }
+  if (!best) return;
+
+  const fromLeft = ball.x < best.x + best.w / 2;
+  const fromTop = ball.y < best.y + best.h / 2;
+  if (bestOx < bestOy) {
+    ball.x += fromLeft ? -bestOx : bestOx;
+    ball.vx = fromLeft ? -Math.abs(ball.vx) : Math.abs(ball.vx);
+  } else {
+    ball.y += fromTop ? -bestOy : bestOy;
+    ball.vy = fromTop ? -Math.abs(ball.vy) : Math.abs(ball.vy);
+  }
+
+  best.alive = false;
+  game.score += best.points;
+  if (!game.blocks.some(b => b.alive)) endGame('won');
+}
+
+function loseLife() {
+  game.lives -= 1;
+  if (game.lives > 0) {
+    game.status = 'ready';
+    attachBall();
+  } else {
+    endGame('lost');
+  }
+}
+
+function update(dt) {
+  if (game.status === 'won' || game.status === 'lost') return;
+
+  movePaddleByKeys(dt);
+
+  const ball = game.ball;
+  if (game.status === 'ready') {
+    attachBall();
+    return;
+  }
+
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+
+  bounceWalls(ball);
+  bouncePaddle(ball, game.paddle);
+  bounceBlock(ball);
+  if (game.status === 'won') return;
+
+  if (ball.y - BALL_R > CANVAS_H) loseLife();
+}
+
+// --- Dibujo ---
+
+function drawCenteredText(text, y, size) {
+  ctx.font = `${size}px monospace`;
+  ctx.fillText(text, CANVAS_W / 2, y);
+}
+
+function render() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+
+  ctx.font = '20px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Puntos: ${game.score}`, 16, HUD_H / 2);
+  ctx.textAlign = 'right';
+  ctx.fillText(`Vidas: ${game.lives}`, CANVAS_W - 16, HUD_H / 2);
+
+  for (const b of game.blocks) {
+    if (b.alive) drawSprite(ctx, `block_${b.color}`, b.x, b.y, b.w, b.h);
+  }
+  const p = game.paddle;
+  drawSprite(ctx, 'paddle', p.x, p.y, p.w, p.h);
+  drawSprite(ctx, 'ball', game.ball.x - BALL_R, game.ball.y - BALL_R, BALL_R * 2, BALL_R * 2);
+
+  ctx.textAlign = 'center';
+  if (game.status === 'ready') {
+    drawCenteredText('Espacio o clic para lanzar', 400, 20);
+  } else if (game.status === 'won' || game.status === 'lost') {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = '#fff';
+    drawCenteredText(game.status === 'won' ? '¡Ganaste!' : 'Game over', 250, 48);
+    drawCenteredText(`Puntos: ${game.score}`, 310, 24);
+    drawCenteredText('Pulsa Enter o haz clic para jugar de nuevo', 360, 18);
+  }
+}
+
+// --- Bucle ---
+
+let lastTime = 0;
+
+function frame(now) {
+  const dt = Math.min((now - lastTime) / 1000, MAX_DT);
+  lastTime = now;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+loadSpritesheet(() => {
+  ctx.imageSmoothingEnabled = false;
+  resetGame();
+  requestAnimationFrame(now => {
+    lastTime = now;
+    frame(now);
+  });
+});
