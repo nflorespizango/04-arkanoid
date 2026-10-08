@@ -27,6 +27,51 @@ const PARTICLE_DURATION = 400;
 const PARTICLE_SPEED_MIN = 80;
 const PARTICLE_SPEED_MAX = 220;
 const PARTICLE_GRAVITY = 600;
+const LEVEL_COUNT = 5;
+const LEVEL_SPEED_STEP = 0.08;
+const LEVEL_COLORS = { r: 'red', y: 'yellow', c: 'cyan', m: 'magenta', h: 'hotpink', g: 'green' };
+const LEVELS = [
+  [
+    'rrrrrrrrrr',
+    'yyyyyyyyyy',
+    'cccccccccc',
+    'mmmmmmmmmm',
+    'hhhhhhhhhh',
+    'gggggggggg',
+  ],
+  [
+    '....rr....',
+    '...yyyy...',
+    '..cccccc..',
+    '.mmmmmmmm.',
+    'hhhhhhhhhh',
+    'gggggggggg',
+  ],
+  [
+    'r.r.r.r.r.',
+    '.y.y.y.y.y',
+    'c.c.c.c.c.',
+    '.m.m.m.m.m',
+    'h.h.h.h.h.',
+    '.g.g.g.g.g',
+  ],
+  [
+    'r.y.cc.y.r',
+    'r.y.cc.y.r',
+    'r.y.cc.y.r',
+    'r.y.cc.y.r',
+    'r.y.cc.y.r',
+    'r.y.cc.y.r',
+  ],
+  [
+    'rrrrrrrrrr',
+    'r...yy...r',
+    'r..cccc..r',
+    'r.mmmmmm.r',
+    'r..hhhh..r',
+    'rrrrrrrrrr',
+  ],
+];
 const PARTICLE_COLORS = {
   red: '#c02a3e',
   yellow: '#d9bd4c',
@@ -49,6 +94,8 @@ const game = {
   blocks: [],
   explosions: [],
   particles: [],
+  level: 1,
+  paused: false,
 };
 
 const keys = {};
@@ -72,17 +119,23 @@ function playSound(base) {
 
 // --- Estado ---
 
-function createBlocks() {
+function ballSpeed() {
+  return BALL_SPEED * (1 + LEVEL_SPEED_STEP * (game.level - 1));
+}
+
+function createBlocks(level) {
   const blocks = [];
-  ROW_COLORS.forEach((color, row) => {
+  LEVELS[level - 1].forEach((line, row) => {
     for (let col = 0; col < BLOCK_COLS; col++) {
+      const color = LEVEL_COLORS[line[col]];
+      if (!color) continue;
       blocks.push({
         x: col * BLOCK_W,
         y: BLOCKS_TOP + row * BLOCK_H,
         w: BLOCK_W,
         h: BLOCK_H,
         color,
-        points: ROW_POINTS[row],
+        points: ROW_POINTS[ROW_COLORS.indexOf(color)],
         alive: true,
       });
     }
@@ -97,16 +150,23 @@ function attachBall() {
   game.ball.vy = 0;
 }
 
+function startLevel(level) {
+  game.level = level;
+  game.status = 'ready';
+  game.blocks = createBlocks(level);
+  game.explosions = [];
+  game.particles = [];
+  attachBall();
+}
+
 function resetGame() {
+  game.paused = false;
   game.status = 'ready';
   game.score = 0;
   game.lives = INITIAL_LIVES;
   game.endedAt = 0;
   game.paddle.x = (CANVAS_W - PADDLE_W) / 2;
-  game.blocks = createBlocks();
-  game.explosions = [];
-  game.particles = [];
-  attachBall();
+  startLevel(1);
 }
 
 function endGame(status) {
@@ -117,8 +177,8 @@ function endGame(status) {
 }
 
 function launchBall() {
-  game.ball.vx = BALL_SPEED * Math.sin(toRad(LAUNCH_ANGLE));
-  game.ball.vy = -BALL_SPEED * Math.cos(toRad(LAUNCH_ANGLE));
+  game.ball.vx = ballSpeed() * Math.sin(toRad(LAUNCH_ANGLE));
+  game.ball.vy = -ballSpeed() * Math.cos(toRad(LAUNCH_ANGLE));
   game.status = 'playing';
 }
 
@@ -135,6 +195,18 @@ window.addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyM') muted = !muted;
+  if ((e.code === 'KeyP' || e.code === 'Escape') && (game.status === 'ready' || game.status === 'playing')) {
+    game.paused = !game.paused;
+    return;
+  }
+  if (game.paused) {
+    const n = e.code.startsWith('Digit') ? Number(e.code.slice(5)) : 0;
+    if (n >= 1 && n <= LEVEL_COUNT) {
+      startLevel(n);
+      game.paused = false;
+    }
+    return;
+  }
   if (e.code === 'Space' && game.status === 'ready') launchBall();
   if (e.code === 'Enter' && (game.status === 'won' || game.status === 'lost') && restartAllowed()) resetGame();
 });
@@ -148,14 +220,14 @@ window.addEventListener('blur', () => {
 });
 
 canvas.addEventListener('mousemove', e => {
-  if (game.status !== 'ready' && game.status !== 'playing') return;
+  if (game.paused || (game.status !== 'ready' && game.status !== 'playing')) return;
   const rect = canvas.getBoundingClientRect();
   const mouseX = (e.clientX - rect.left - canvas.clientLeft) * (CANVAS_W / canvas.clientWidth);
   game.paddle.x = clamp(mouseX - PADDLE_W / 2, 0, CANVAS_W - PADDLE_W);
 });
 
 canvas.addEventListener('mousedown', e => {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || game.paused) return;
   if (game.status === 'ready') launchBall();
   else if ((game.status === 'won' || game.status === 'lost') && restartAllowed()) resetGame();
 });
@@ -194,8 +266,8 @@ function bouncePaddle(ball, paddle) {
   ball.y = paddle.y - BALL_R;
   const offset = clamp((ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2), -1, 1);
   const angle = toRad(offset * MAX_BOUNCE_ANGLE);
-  ball.vx = BALL_SPEED * Math.sin(angle);
-  ball.vy = -BALL_SPEED * Math.cos(angle);
+  ball.vx = ballSpeed() * Math.sin(angle);
+  ball.vy = -ballSpeed() * Math.cos(angle);
   playSound(sounds.bounce);
 }
 
@@ -243,7 +315,10 @@ function bounceBlock(ball) {
   game.explosions.push({ x: best.x, y: best.y, w: best.w, h: best.h, color: best.color, elapsed: 0 });
   spawnParticles(best);
   game.score += best.points;
-  if (!game.blocks.some(b => b.alive)) endGame('won');
+  if (!game.blocks.some(b => b.alive)) {
+    if (game.level < LEVEL_COUNT) startLevel(game.level + 1);
+    else endGame('won');
+  }
 }
 
 function loseLife() {
@@ -272,6 +347,7 @@ function updateParticles(dt) {
 }
 
 function update(dt) {
+  if (game.paused) return;
   updateExplosions(dt);
   updateParticles(dt);
   if (game.status === 'won' || game.status === 'lost') return;
@@ -312,10 +388,8 @@ function render() {
   ctx.fillText(`Puntos: ${game.score}`, 16, HUD_H / 2);
   ctx.textAlign = 'right';
   ctx.fillText(`Vidas: ${game.lives}`, CANVAS_W - 16, HUD_H / 2);
-  if (muted) {
-    ctx.textAlign = 'center';
-    ctx.fillText('Silencio (M)', CANVAS_W / 2, HUD_H / 2);
-  }
+  ctx.textAlign = 'center';
+  ctx.fillText(muted ? `Nivel ${game.level} - Silencio (M)` : `Nivel ${game.level}`, CANVAS_W / 2, HUD_H / 2);
 
   for (const b of game.blocks) {
     if (b.alive) drawSprite(ctx, `block_${b.color}`, b.x, b.y, b.w, b.h);
@@ -351,6 +425,15 @@ function render() {
     drawCenteredText(game.status === 'won' ? '¡Ganaste!' : 'Game over', 250, 48);
     drawCenteredText(`Puntos: ${game.score}`, 310, 24);
     drawCenteredText('Pulsa Enter o haz clic para jugar de nuevo', 360, 18);
+  }
+  if (game.paused) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = '#fff';
+    drawCenteredText('Pausa', 230, 48);
+    drawCenteredText(`Nivel actual: ${game.level}`, 290, 24);
+    drawCenteredText(`Pulsa 1-${LEVEL_COUNT} para ir a un nivel`, 340, 20);
+    drawCenteredText('P o Esc para continuar', 380, 18);
   }
 }
 
